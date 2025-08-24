@@ -14,9 +14,9 @@ type Store struct {
 
 // Link represents a shortened URL link.
 type Link struct {
-	ID   int64
-	Path string
-	URL  string
+	ID   int64  `json:"id"`
+	Path string `json:"path"`
+	URL  string `json:"url"`
 }
 
 // NewStore creates a new Store and initializes the database.

@@ -143,6 +143,13 @@ func (s *Server) apiLinkIDHandler(w http.ResponseWriter, r *http.Request, id int
 }
 
 // handleGetLinks retrieves all links and returns them as JSON.
+// GetLinks godoc
+// @Summary      List links
+// @Description  Retrieve all stored links
+// @Tags         links
+// @Produce      json
+// @Success      200  {array}   Link
+// @Router       /links [get]
 func (s *Server) handleGetLinks(w http.ResponseWriter, r *http.Request) {
 	links, err := s.store.GetAllLinks()
 	if err != nil {
@@ -156,6 +163,17 @@ func (s *Server) handleGetLinks(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleCreateLink creates a new link from the request body.
+// CreateLink godoc
+// @Summary      Create a link
+// @Description  Create a new link
+// @Tags         links
+// @Accept       json
+// @Produce      json
+// @Param        link  body      Link  true  "Link payload"
+// @Success      201
+// @Failure      400  {string}  string  "Invalid request body"
+// @Failure      500  {string}  string  "Failed to create link"
+// @Router       /links [post]
 func (s *Server) handleCreateLink(w http.ResponseWriter, r *http.Request) {
 	var link Link
 	if err := json.NewDecoder(r.Body).Decode(&link); err != nil {
@@ -174,6 +192,18 @@ func (s *Server) handleCreateLink(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUpdateLink updates an existing link.
+// UpdateLink godoc
+// @Summary      Update a link
+// @Description  Update an existing link by ID
+// @Tags         links
+// @Accept       json
+// @Produce      json
+// @Param        id    path      int   true  "Link ID"
+// @Param        link  body      Link  true  "Link payload"
+// @Success      200
+// @Failure      400  {string}  string  "Invalid request body"
+// @Failure      500  {string}  string  "Failed to update link"
+// @Router       /links/{id} [put]
 func (s *Server) handleUpdateLink(w http.ResponseWriter, r *http.Request, id int64) {
 	var link Link
 	if err := json.NewDecoder(r.Body).Decode(&link); err != nil {
@@ -191,6 +221,14 @@ func (s *Server) handleUpdateLink(w http.ResponseWriter, r *http.Request, id int
 }
 
 // handleDeleteLink deletes a link by its ID.
+// DeleteLink godoc
+// @Summary      Delete a link
+// @Description  Delete a link by ID
+// @Tags         links
+// @Param        id  path  int  true  "Link ID"
+// @Success      200
+// @Failure      500  {string}  string  "Failed to delete link"
+// @Router       /links/{id} [delete]
 func (s *Server) handleDeleteLink(w http.ResponseWriter, r *http.Request, id int64) {
 	if err := s.store.DeleteLink(id); err != nil {
 		log.Printf("API DeleteLink error: %v", err)
