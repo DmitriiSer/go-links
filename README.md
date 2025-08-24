@@ -85,12 +85,26 @@ For a real-world deployment example, see the detailed guide on setting up **Go L
 
 ➡️ **[Full Guide: Go Links with pfSense and Raspberry Pi](./docs/pfsense-raspberrypi-guide.md)**
 
-## Roadmap
+## Project Status & Roadmap
 
-The vision is to create a full-featured link management portal.
+This project is under active development. Here is a summary of completed features and planned enhancements.
 
-- [ ] **Web UI**: Create a web interface at a dedicated path (e.g., `/manage`) for CRUD (Create, Read, Update, Delete) operations on links.
-- [ ] **Link Validation**: Ensure that users can only create aliases for paths that are not already taken.
+### Completed Features
+
+- [x] **Core Redirector Service**: The server correctly redirects aliases to their destination URLs.
+- [x] **CGo-Free Database**: Uses a pure Go SQLite driver, ensuring easy cross-compilation.
+- [x] **Deployment Guide**: Includes a detailed guide for a real-world deployment scenario.
+
+### Planned Enhancements
+
+The vision is to create a full-featured link management portal using a modern Go-based stack.
+
+- [ ] **JSON API**: The server provides a JSON response for API clients via content negotiation.
+- [ ] **Link Management Portal (`/go`)**
+  - [ ] **Go + HTMX Stack**: Build the portal using Go's `html/template` package for server-side rendering, enhanced with _HTMX_ for dynamic UI interactions without page reloads.
+  - [ ] **Modern Styling**: Integrate _Tailwind CSS_ to replicate the look and feel of modern UI components (like `shadcn/ui`).
+  - [ ] **Full CRUD UI**: Implement the interface for creating, reading, updating, and deleting links.
+- [ ] **Enhanced Validation**: Add robust server-side validation to prevent creating duplicate or invalid aliases.
 - [ ] **Configuration**: Allow the port and database file path to be configured via environment variables or command-line flags.
 
 ## License
