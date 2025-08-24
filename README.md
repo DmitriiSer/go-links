@@ -79,6 +79,12 @@ func main() {
   }
   ```
 
+## Deployment Guide
+
+For a real-world deployment example, see the detailed guide on setting up **Go Links** in a home network using _pfSense_ for DNS and a _Raspberry Pi_ with _Nginx_ as a reverse proxy.
+
+➡️ **[Full Guide: Go Links with pfSense and Raspberry Pi](./docs/pfsense-raspberrypi-guide.md)**
+
 ## Roadmap
 
 The vision is to create a full-featured link management portal.
