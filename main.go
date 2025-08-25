@@ -3,100 +3,89 @@ package main
 import (
 	"log"
 	"net/http"
-	"encoding/json"
-	"reflect"
+	"strconv"
 
-	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/getkin/kin-openapi/openapi3gen"
+	restfulspec "github.com/emicklei/go-restful-openapi/v2"
+	restful "github.com/emicklei/go-restful/v3"
+	"github.com/go-openapi/spec"
 )
 
-var openAPIDoc *openapi3.T
+func setupAPI(server *Server) *restful.Container {
+	container := restful.NewContainer()
 
-func initOpenAPIDoc() {
-	// Build OpenAPI 3 document at runtime
-	doc := &openapi3.T{
-		OpenAPI: "3.0.3",
-		Info: &openapi3.Info{
-			Title:       "Go Links API",
-			Version:     "1.0",
-			Description: "API for managing go links (CRUD and redirects)",
+	ws := new(restful.WebService)
+	ws.Path("/api").Consumes(restful.MIME_JSON).Produces(restful.MIME_JSON)
+
+	// GET /api/links
+	ws.Route(ws.GET("/links").
+		To(func(req *restful.Request, resp *restful.Response) {
+			server.apiLinksHandler(resp.ResponseWriter, req.Request)
+		}).
+		Doc("List links").
+		Writes([]Link{}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{"links"}))
+
+	// POST /api/links
+	ws.Route(ws.POST("/links").
+		To(func(req *restful.Request, resp *restful.Response) {
+			server.apiLinksHandler(resp.ResponseWriter, req.Request)
+		}).
+		Doc("Create link").
+		Reads(Link{}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{"links"}))
+
+	// PUT /api/links/{id}
+	ws.Route(ws.PUT("/links/{id}").
+		To(func(req *restful.Request, resp *restful.Response) {
+			idStr := req.PathParameter("id")
+			id, err := strconv.ParseInt(idStr, 10, 64)
+			if err != nil {
+				resp.WriteErrorString(http.StatusBadRequest, "invalid id")
+				return
+			}
+			server.apiLinkIDHandler(resp.ResponseWriter, req.Request, id)
+		}).
+		Doc("Update link").
+		Param(ws.PathParameter("id", "Link ID").DataType("integer")).
+		Reads(Link{}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{"links"}))
+
+	// DELETE /api/links/{id}
+	ws.Route(ws.DELETE("/links/{id}").
+		To(func(req *restful.Request, resp *restful.Response) {
+			idStr := req.PathParameter("id")
+			id, err := strconv.ParseInt(idStr, 10, 64)
+			if err != nil {
+				resp.WriteErrorString(http.StatusBadRequest, "invalid id")
+				return
+			}
+			server.apiLinkIDHandler(resp.ResponseWriter, req.Request, id)
+		}).
+		Doc("Delete link").
+		Param(ws.PathParameter("id", "Link ID").DataType("integer")).
+		Metadata(restfulspec.KeyOpenAPITags, []string{"links"}))
+
+	container.Add(ws)
+
+	// OpenAPI service mounted at /api/swagger/openapi.json
+	cfg := restfulspec.Config{
+		WebServices: []*restful.WebService{ws},
+		APIPath:     "/api/swagger/openapi.json",
+		PostBuildSwaggerObjectHandler: func(sw *spec.Swagger) {
+			sw.Info = &spec.Info{InfoProps: spec.InfoProps{
+				Title:       "Go Links API",
+				Version:     "1.0",
+				Description: "API for managing go links (CRUD and redirects)",
+			}}
+			// Keep BasePath empty because paths already include /api from ws.Path("/api")
+			sw.BasePath = ""
+			// Clear Host so UI uses current origin (prevents http://go/...)
+			sw.Host = ""
+			sw.Schemes = []string{"https"}
 		},
-		Servers: openapi3.Servers{{URL: "/api"}},
 	}
-
-	// Initialize components and paths (pointers required)
-	components := openapi3.NewComponents()
-	doc.Components = &components
-	doc.Paths = openapi3.NewPaths()
-	// Initialize schema map to avoid nil map assignment
-	if doc.Components.Schemas == nil {
-		doc.Components.Schemas = make(openapi3.Schemas)
-	}
-
-	// Schemas from Go types
-	gen := openapi3gen.NewGenerator()
-	if linkSchemaRef, err := gen.GenerateSchemaRef(reflect.TypeOf(Link{})); err == nil {
-		doc.Components.Schemas["Link"] = linkSchemaRef
-	}
-
-	// GET /links
-	getLinks := openapi3.NewOperation()
-	getLinks.Summary = "List links"
-	getLinks.Description = "Retrieve all stored links"
-	getLinks.Tags = []string{"links"}
-	getLinks.AddResponse(200, openapi3.NewResponse().
-		WithDescription("OK").
-		WithJSONSchema(&openapi3.Schema{Type: "array", Items: &openapi3.SchemaRef{Ref: "#/components/schemas/Link"}}))
-	// POST /links
-	createLink := openapi3.NewOperation()
-	createLink.Summary = "Create a link"
-	createLink.Description = "Create a new link"
-	createLink.Tags = []string{"links"}
-	createLink.RequestBody = &openapi3.RequestBodyRef{Value: &openapi3.RequestBody{
-		Required: true,
-		Content:  openapi3.NewContentWithJSONSchemaRef(&openapi3.SchemaRef{Ref: "#/components/schemas/Link"}),
-	}}
-	createLink.AddResponse(201, openapi3.NewResponse().WithDescription("Created"))
-	createLink.AddResponse(400, openapi3.NewResponse().WithDescription("Invalid request body"))
-	createLink.AddResponse(500, openapi3.NewResponse().WithDescription("Failed to create link"))
-
-	doc.AddOperation("/links", http.MethodGet, getLinks)
-	doc.AddOperation("/links", http.MethodPost, createLink)
-
-	// PUT /links/{id}
-	updateLink := openapi3.NewOperation()
-	updateLink.Summary = "Update a link"
-	updateLink.Description = "Update an existing link by ID"
-	updateLink.Tags = []string{"links"}
-	updateLink.AddParameter(openapi3.NewPathParameter("id").WithSchema(&openapi3.Schema{Type: "integer"}))
-	updateLink.RequestBody = &openapi3.RequestBodyRef{Value: &openapi3.RequestBody{
-		Required: true,
-		Content:  openapi3.NewContentWithJSONSchemaRef(&openapi3.SchemaRef{Ref: "#/components/schemas/Link"}),
-	}}
-	updateLink.AddResponse(200, openapi3.NewResponse().WithDescription("OK"))
-	updateLink.AddResponse(400, openapi3.NewResponse().WithDescription("Invalid request body"))
-	updateLink.AddResponse(500, openapi3.NewResponse().WithDescription("Failed to update link"))
-
-	// DELETE /links/{id}
-	deleteLink := openapi3.NewOperation()
-	deleteLink.Summary = "Delete a link"
-	deleteLink.Description = "Delete a link by ID"
-	deleteLink.Tags = []string{"links"}
-	deleteLink.AddParameter(openapi3.NewPathParameter("id").WithSchema(&openapi3.Schema{Type: "integer"}))
-	deleteLink.AddResponse(200, openapi3.NewResponse().WithDescription("OK"))
-	deleteLink.AddResponse(500, openapi3.NewResponse().WithDescription("Failed to delete link"))
-
-	doc.AddOperation("/links/{id}", http.MethodPut, updateLink)
-	doc.AddOperation("/links/{id}", http.MethodDelete, deleteLink)
-
-	openAPIDoc = doc
-}
-
-// func strPtr(s string) *string { return &s }
-
-func openAPIJSONHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(openAPIDoc)
+	container.Add(restfulspec.NewOpenAPIService(cfg))
+	return container
 }
 
 func swaggerUIHandler(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +94,7 @@ func swaggerUIHandler(w http.ResponseWriter, r *http.Request) {
 	<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
 	</head><body><div id="swagger"></div>
 	<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-	<script>window.ui = SwaggerUIBundle({ url: '/swagger/openapi.json', dom_id: '#swagger' });</script>
+	<script>window.ui = SwaggerUIBundle({ url: '/api/swagger/openapi.json', dom_id: '#swagger' });</script>
 	</body></html>`
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write([]byte(html))
@@ -125,10 +114,10 @@ func main() {
 		log.Fatalf("Failed to create server: %v", err)
 	}
 
-	// Build OpenAPI doc and set up the HTTP server.
-	initOpenAPIDoc()
+	// Routes: /api via go-restful (auto OpenAPI), others via net/http
+	apiContainer := setupAPI(server)
 	mux := http.NewServeMux()
-	mux.HandleFunc("/swagger/openapi.json", openAPIJSONHandler)
+	mux.Handle("/api/", apiContainer)
 	mux.HandleFunc("/swagger", swaggerUIHandler)
 	mux.HandleFunc("/", server.rootHandler)
 
