@@ -190,7 +190,11 @@ func (s *Server) handleCreateLink(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.store.CreateLink(link.Path, link.URL); err != nil {
 		log.Printf("API CreateLink error: %v", err)
-		// This could be a unique constraint violation, which is a client error.
+		// Check if it's a user-friendly error (like duplicate path)
+		if strings.Contains(err.Error(), "already exists") {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "Failed to create link", http.StatusInternalServerError)
 		return
 	}
@@ -225,6 +229,11 @@ func (s *Server) handleUpdateLink(w http.ResponseWriter, r *http.Request, id int
 
 	if err := s.store.UpdateLink(id, link.Path, link.URL); err != nil {
 		log.Printf("API UpdateLink error: %v", err)
+		// Check if it's a user-friendly error (like duplicate path)
+		if strings.Contains(err.Error(), "already exists") {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "Failed to update link", http.StatusInternalServerError)
 		return
 	}

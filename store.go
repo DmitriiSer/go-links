@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -77,14 +78,26 @@ func (s *Store) GetAllLinks() ([]Link, error) {
 func (s *Store) CreateLink(path, url string) error {
 	insertSQL := `INSERT INTO links(path, url) VALUES(?, ?)`
 	_, err := s.db.Exec(insertSQL, path, url)
-	return err
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed: links.path") {
+			return fmt.Errorf("a link with path '%s' already exists", path)
+		}
+		return err
+	}
+	return nil
 }
 
 // UpdateLink updates an existing link.
 func (s *Store) UpdateLink(id int64, path, url string) error {
 	updateSQL := `UPDATE links SET path = ?, url = ? WHERE id = ?`
 	_, err := s.db.Exec(updateSQL, path, url, id)
-	return err
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed: links.path") {
+			return fmt.Errorf("a link with path '%s' already exists", path)
+		}
+		return err
+	}
+	return nil
 }
 
 // DeleteLink removes a link from the database by its ID.
