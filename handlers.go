@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -181,6 +182,11 @@ func (s *Server) handleCreateLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := validateLink(link); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	if err := s.store.CreateLink(link.Path, link.URL); err != nil {
 		log.Printf("API CreateLink error: %v", err)
 		// This could be a unique constraint violation, which is a client error.
@@ -211,6 +217,11 @@ func (s *Server) handleUpdateLink(w http.ResponseWriter, r *http.Request, id int
 		return
 	}
 
+	if err := validateLink(link); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	if err := s.store.UpdateLink(id, link.Path, link.URL); err != nil {
 		log.Printf("API UpdateLink error: %v", err)
 		http.Error(w, "Failed to update link", http.StatusInternalServerError)
@@ -237,4 +248,22 @@ func (s *Server) handleDeleteLink(w http.ResponseWriter, r *http.Request, id int
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// validateLink ensures the link payload has a valid HTTP/HTTPS URL.
+func validateLink(link Link) error {
+	if strings.TrimSpace(link.URL) == "" {
+		return fmt.Errorf("url is required")
+	}
+	u, err := url.ParseRequestURI(link.URL)
+	if err != nil {
+		return fmt.Errorf("invalid url")
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("unsupported url scheme")
+	}
+	if u.Host == "" {
+		return fmt.Errorf("url host is required")
+	}
+	return nil
 }

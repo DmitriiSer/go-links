@@ -1,23 +1,20 @@
 # Go Links - A Simple URL Shortener
 
-A lightweight, self-hosted URL shortener inspired by the "Go Links" systems used internally at many companies. This service allows you to create simple, memorable aliases (like `go/pr`) that redirect to longer, more complex URLs.
-
-It's built with Go and uses a local SQLite database, making it fast, portable, and easy to deploy with zero external dependencies.
+A lightweight, self-hosted URL shortener inspired by internal "Go Links" systems. Create simple, memorable aliases (like `go/pr`) that redirect to longer URLs. Built in Go with a local SQLite database—fast, portable, and easy to deploy.
 
 ## Features
 
-- **Simple Redirects**: Turns `http://localhost:3000/<alias>` into a redirect to your destination URL.
-- **Zero Dependencies**: Runs as a single binary with an embedded SQLite database. No CGo required, ensuring easy cross-compilation (e.g., for a Raspberry Pi).
-- **Content Negotiation**:
-  - Acts as a standard redirector for browsers.
-  - Returns a JSON response for API clients that send an `Accept: application/json` header.
-- **Easy to Deploy**: Just build and run the binary.
+- **Simple redirects**: Visit `http://localhost:3000/<alias>` to get redirected to the destination URL.
+- **Runtime OpenAPI + Swagger UI**: API spec is generated at runtime; explore and test via Swagger UI.
+- **REST JSON API**: Full CRUD for links under `/api`.
+- **Pure Go SQLite**: Uses a CGo-free SQLite driver; easy cross-compilation and ARM-friendly.
+- **Easy deploy**: Single binary; works well behind Nginx/HTTPS.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Go (version 1.18 or newer recommended)
+- Go (1.20+ recommended)
 
 ### Installation & Running
 
@@ -36,48 +33,59 @@ It's built with Go and uses a local SQLite database, making it fast, portable, a
 
 3.  **Run the server:**
     ```bash
-    go run main.go
+    go run .
     ```
 
-The server will start on `http://localhost:3000` and create a `links.db` file in the project directory to store the links.
+    The server starts on `http://localhost:3000` and creates `links.db` in the project directory.
 
-## Usage
+    Optional (dev auto-reload):
+    ```bash
+    # Install wgo (file watcher for Go development)
+    go install github.com/bokwoon95/wgo@latest
+    
+    # wgo wraps a command and reruns on file changes
+    wgo go run .
+    # If PATH issues occur: /home/<you>/go/bin/wgo go run .
+    ```
 
-### Creating Links
+## API and Docs
 
-Currently, links are added directly in the `main()` function in `main.go`. This is a temporary measure until the management UI is implemented.
+- **Swagger UI**: `http://localhost:3000/swagger`
+- **OpenAPI JSON**: `http://localhost:3000/api/swagger/openapi.json`
 
-To add a new link, use the `insertGoLink` function:
+Notes for reverse proxy/HTTPS:
+- The spec advertises `https` and leaves `host` empty so the UI uses the current origin. Works cleanly behind Nginx TLS termination.
 
-```go
-// filepath: main.go
-// ...existing code...
-func main() {
-// ...existing code...
-    // For demonstration, let's add a sample link.
-    insertGoLink("g", "https://google.com")
-    insertGoLink("github", "https://github.com")
-    insertGoLink("my-pr", "https://github.com/user/repo/pull/123") // Add your new link here
+### Endpoints (under `/api`)
 
-    mux := http.NewServeMux()
-// ...existing code...
-```
-
-### Accessing Links
-
-- **Browser Redirect**: Navigate to `http://localhost:3000/<alias>` in your browser. For example, `http://localhost:3000/g` will redirect to `https://google.com`.
-
-- **API Request**: Use a tool like `curl` to get a JSON response.
+- `GET /api/links` → List links
   ```bash
-  curl -H "Accept: application/json" http://localhost:3000/github
+  curl http://localhost:3000/api/links
   ```
-  **Response:**
-  ```json
-  {
-    "path": "github",
-    "url": "https://github.com"
-  }
+
+- `POST /api/links` → Create link
+  ```bash
+  curl -X POST http://localhost:3000/api/links \
+    -H 'Content-Type: application/json' \
+    -d '{"path":"g","url":"https://google.com"}'
   ```
+  - Validation: rejects empty/malformed URLs, non-http(s) schemes, and missing host (400).
+
+- `PUT /api/links/{id}` → Update link
+  ```bash
+  curl -X PUT http://localhost:3000/api/links/1 \
+    -H 'Content-Type: application/json' \
+    -d '{"path":"g","url":"https://google.com"}'
+  ```
+
+- `DELETE /api/links/{id}` → Delete link
+  ```bash
+  curl -X DELETE http://localhost:3000/api/links/1
+  ```
+
+### Redirects
+
+Navigate to `http://localhost:3000/<alias>` (e.g., `http://localhost:3000/g`) to be redirected to the configured URL.
 
 ## Deployment Guide
 
@@ -89,23 +97,20 @@ For a real-world deployment example, see the detailed guide on setting up **Go L
 
 This project is under active development. Here is a summary of completed features and planned enhancements.
 
-### Completed Features
+### Completed
 
-- [x] **Core Redirector Service**: The server correctly redirects aliases to their destination URLs.
-- [x] **CGo-Free Database**: Uses a pure Go SQLite driver, ensuring easy cross-compilation.
-- [x] **Deployment Guide**: Includes a detailed guide for a real-world deployment scenario.
+- [x] Core redirector service
+- [x] Pure Go SQLite store
+- [x] Runtime OpenAPI generation and Swagger UI
+- [x] CRUD JSON API under `/api`
+- [x] Basic URL validation on create/update
+- [x] Deployment guide (pfSense + Raspberry Pi + Nginx)
 
-### Planned Enhancements
+### Planned
 
-The vision is to create a full-featured link management portal using a modern Go-based stack.
-
-- [ ] **JSON API**: The server provides a JSON response for API clients via content negotiation.
-- [ ] **Link Management Portal (`/go`)**
-  - [ ] **Go + HTMX Stack**: Build the portal using Go's `html/template` package for server-side rendering, enhanced with _HTMX_ for dynamic UI interactions without page reloads.
-  - [ ] **Modern Styling**: Integrate _Tailwind CSS_ to replicate the look and feel of modern UI components (like `shadcn/ui`).
-  - [ ] **Full CRUD UI**: Implement the interface for creating, reading, updating, and deleting links.
-- [ ] **Enhanced Validation**: Add robust server-side validation to prevent creating duplicate or invalid aliases.
-- [ ] **Configuration**: Allow the port and database file path to be configured via environment variables or command-line flags.
+- [ ] Link management portal at `/go` (SSR templates + HTMX)
+- [ ] Additional validation (path rules, uniqueness feedback)
+- [ ] Configuration via env/flags (port, DB path)
 
 ## License
 
