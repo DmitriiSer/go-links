@@ -38,6 +38,21 @@ A lightweight, self-hosted URL shortener inspired by internal "Go Links" systems
 
     The server starts on `http://localhost:3000` and creates `links.db` in the project directory.
 
+    **Configuration options:**
+    ```bash
+    # Using environment variables
+    PORT=8080 DB_PATH=/data/links.db go run .
+    
+    # Using command line flags
+    go run . --port 8080 --db-path /data/links.db --host 127.0.0.1
+    
+    # Using short flags
+    go run . -p 8080 -d /data/links.db -h 0.0.0.0
+    
+    # Show help
+    go run . --help
+    ```
+
     Optional (dev auto-reload):
     ```bash
     # Install wgo (file watcher for Go development)
@@ -48,9 +63,46 @@ A lightweight, self-hosted URL shortener inspired by internal "Go Links" systems
     # If PATH issues occur: /home/<you>/go/bin/wgo go run .
     ```
 
+## Configuration
+
+Go Links supports flexible configuration via environment variables and command line flags. **Command line flags take precedence over environment variables.**
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | Server port | `3000` |
+| `HOST` | Server host (empty = all interfaces) | `` |
+| `DB_PATH` | Database file path | `./links.db` |
+
+### Command Line Flags
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--port` | `-p` | Server port |
+| `--host` | `-h` | Server host |
+| `--db-path` | `-d` | Database file path |
+| `--help` | | Show help information |
+
+### Examples
+
+```bash
+# Production deployment
+./go-links --port 80 --db-path /var/lib/go-links/links.db
+
+# Development with different port
+PORT=8080 go run .
+
+# Docker/container deployment
+docker run -e PORT=3000 -e DB_PATH=/data/links.db go-links
+
+# Custom host binding
+./go-links --host 127.0.0.1 --port 8080
+```
+
 ## API and Docs
 
-- **Swagger UI**: `http://localhost:3000/swagger`
+- **Swagger UI**: `http://localhost:3000/swagger` (or your configured port)
 - **OpenAPI JSON**: `http://localhost:3000/api/swagger/openapi.json`
 
 Notes for reverse proxy/HTTPS:
@@ -106,12 +158,12 @@ This project is under active development. Here is a summary of completed feature
 - [x] Comprehensive input validation (URL schemes, path rules, reserved words)
 - [x] Advanced error handling (proper HTTP status codes, structured JSON responses)
 - [x] Uniqueness validation with clear feedback
+- [x] Flexible configuration (environment variables, command line flags)
 - [x] Deployment guide (pfSense + Raspberry Pi + Nginx)
 
 ### Planned
 
 - [ ] Link management portal at `/go` (SSR templates + HTMX)
-- [ ] Configuration via env/flags (port, DB path)
 
 ## License
 

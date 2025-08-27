@@ -101,8 +101,17 @@ func swaggerUIHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// Load configuration from environment variables and command line flags
+	config, err := LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+
+	// Log the configuration being used
+	log.Printf("Starting Go Links server with configuration: %s", config)
+
 	// Initialize the database store.
-	store, err := NewStore("./links.db")
+	store, err := NewStore(config.DBPath)
 	if err != nil {
 		log.Fatalf("Failed to create store: %v", err)
 	}
@@ -121,10 +130,8 @@ func main() {
 	mux.HandleFunc("/swagger", swaggerUIHandler)
 	mux.HandleFunc("/", server.rootHandler)
 
-	port := "3000"
-	log.Println("Server starting on port " + port + "...")
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
-		// Use log.Fatalf for consistency.
+	log.Printf("Server starting on %s...", config.Address())
+	if err := http.ListenAndServe(config.Address(), mux); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 }
