@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -250,8 +251,14 @@ func (s *Server) handleDeleteLink(w http.ResponseWriter, r *http.Request, id int
 	w.WriteHeader(http.StatusOK)
 }
 
-// validateLink ensures the link payload has a valid HTTP/HTTPS URL.
+// validateLink ensures the link payload has a valid path and HTTP/HTTPS URL.
 func validateLink(link Link) error {
+	// Validate path
+	if err := validatePath(link.Path); err != nil {
+		return err
+	}
+
+	// Validate URL
 	if strings.TrimSpace(link.URL) == "" {
 		return fmt.Errorf("url is required")
 	}
@@ -265,5 +272,36 @@ func validateLink(link Link) error {
 	if u.Host == "" {
 		return fmt.Errorf("url host is required")
 	}
+	return nil
+}
+
+// validatePath ensures the path follows allowed format rules and isn't reserved.
+func validatePath(path string) error {
+	// Trim whitespace
+	path = strings.TrimSpace(path)
+
+	// Length constraints
+	if len(path) == 0 {
+		return fmt.Errorf("path is required")
+	}
+	if len(path) > 50 {
+		return fmt.Errorf("path must be 50 characters or less")
+	}
+
+	// Format validation (alphanumeric, hyphens, underscores only)
+	// Allow both uppercase and lowercase, but we'll normalize to lowercase in storage
+	if !regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString(path) {
+		return fmt.Errorf("path can only contain letters, numbers, hyphens, and underscores")
+	}
+
+	// Check for reserved words (case-insensitive)
+	pathLower := strings.ToLower(path)
+	reserved := []string{"api", "swagger", "go", "favicon.ico", "robots.txt"}
+	for _, word := range reserved {
+		if pathLower == word {
+			return fmt.Errorf("'%s' is a reserved path", path)
+		}
+	}
+
 	return nil
 }

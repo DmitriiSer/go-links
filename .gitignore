@@ -1,1 +1,5 @@
-links.db
+# Compiled binaries
+go-links
+
+# Database files
+*.db
