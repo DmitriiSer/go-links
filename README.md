@@ -103,13 +103,14 @@ This project is under active development. Here is a summary of completed feature
 - [x] Pure Go SQLite store
 - [x] Runtime OpenAPI generation and Swagger UI
 - [x] CRUD JSON API under `/api`
-- [x] Basic URL validation on create/update
+- [x] Comprehensive input validation (URL schemes, path rules, reserved words)
+- [x] Advanced error handling (proper HTTP status codes, structured JSON responses)
+- [x] Uniqueness validation with clear feedback
 - [x] Deployment guide (pfSense + Raspberry Pi + Nginx)
 
 ### Planned
 
 - [ ] Link management portal at `/go` (SSR templates + HTMX)
-- [ ] Additional validation (path rules, uniqueness feedback)
 - [ ] Configuration via env/flags (port, DB path)
 
 ## License
