@@ -104,7 +104,7 @@ func (s *Server) apiRouter(w http.ResponseWriter, r *http.Request) {
 	if len(parts) == 3 {
 		id, err := strconv.ParseInt(parts[2], 10, 64)
 		if err != nil {
-			http.Error(w, "Invalid link ID", http.StatusBadRequest)
+			writeErrorJSON(w, "Invalid link ID", http.StatusBadRequest)
 			return
 		}
 		s.apiLinkIDHandler(w, r, id)
@@ -156,7 +156,7 @@ func (s *Server) handleGetLinks(w http.ResponseWriter, r *http.Request) {
 	links, err := s.store.GetAllLinks()
 	if err != nil {
 		log.Printf("API GetLinks error: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		writeErrorJSON(w, "Failed to retrieve links", http.StatusInternalServerError)
 		return
 	}
 
@@ -179,12 +179,12 @@ func (s *Server) handleGetLinks(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCreateLink(w http.ResponseWriter, r *http.Request) {
 	var link Link
 	if err := json.NewDecoder(r.Body).Decode(&link); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		writeErrorJSON(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if err := validateLink(link); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeErrorJSON(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -192,10 +192,10 @@ func (s *Server) handleCreateLink(w http.ResponseWriter, r *http.Request) {
 		log.Printf("API CreateLink error: %v", err)
 		// Check if it's a user-friendly error (like duplicate path)
 		if strings.Contains(err.Error(), "already exists") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			writeErrorJSON(w, err.Error(), http.StatusConflict)
 			return
 		}
-		http.Error(w, "Failed to create link", http.StatusInternalServerError)
+		writeErrorJSON(w, "Failed to create link", http.StatusInternalServerError)
 		return
 	}
 
@@ -216,14 +216,26 @@ func (s *Server) handleCreateLink(w http.ResponseWriter, r *http.Request) {
 // @Failure      500  {string}  string  "Failed to update link"
 // @Router       /links/{id} [put]
 func (s *Server) handleUpdateLink(w http.ResponseWriter, r *http.Request, id int64) {
+	// Check if link exists first
+	exists, err := s.store.LinkExists(id)
+	if err != nil {
+		log.Printf("API UpdateLink existence check error: %v", err)
+		writeErrorJSON(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !exists {
+		writeErrorJSON(w, fmt.Sprintf("Link with id %d not found", id), http.StatusNotFound)
+		return
+	}
+
 	var link Link
 	if err := json.NewDecoder(r.Body).Decode(&link); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		writeErrorJSON(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if err := validateLink(link); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeErrorJSON(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -231,10 +243,10 @@ func (s *Server) handleUpdateLink(w http.ResponseWriter, r *http.Request, id int
 		log.Printf("API UpdateLink error: %v", err)
 		// Check if it's a user-friendly error (like duplicate path)
 		if strings.Contains(err.Error(), "already exists") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			writeErrorJSON(w, err.Error(), http.StatusConflict)
 			return
 		}
-		http.Error(w, "Failed to update link", http.StatusInternalServerError)
+		writeErrorJSON(w, "Failed to update link", http.StatusInternalServerError)
 		return
 	}
 
@@ -253,11 +265,16 @@ func (s *Server) handleUpdateLink(w http.ResponseWriter, r *http.Request, id int
 func (s *Server) handleDeleteLink(w http.ResponseWriter, r *http.Request, id int64) {
 	if err := s.store.DeleteLink(id); err != nil {
 		log.Printf("API DeleteLink error: %v", err)
-		http.Error(w, "Failed to delete link", http.StatusInternalServerError)
+		// Check if it's a "not found" error
+		if strings.Contains(err.Error(), "not found") {
+			writeErrorJSON(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		writeErrorJSON(w, "Failed to delete link", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // validateLink ensures the link payload has a valid path and HTTP/HTTPS URL.
@@ -313,4 +330,21 @@ func validatePath(path string) error {
 	}
 
 	return nil
+}
+
+// ErrorResponse represents a structured error response.
+type ErrorResponse struct {
+	Error   string `json:"error"`
+	Message string `json:"message,omitempty"`
+}
+
+// writeErrorJSON writes a structured JSON error response.
+func writeErrorJSON(w http.ResponseWriter, message string, statusCode int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	response := ErrorResponse{
+		Error:   http.StatusText(statusCode),
+		Message: message,
+	}
+	json.NewEncoder(w).Encode(response)
 }

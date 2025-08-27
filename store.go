@@ -100,9 +100,30 @@ func (s *Store) UpdateLink(id int64, path, url string) error {
 	return nil
 }
 
+// LinkExists checks if a link with the given ID exists.
+func (s *Store) LinkExists(id int64) (bool, error) {
+	var exists bool
+	query := `SELECT EXISTS(SELECT 1 FROM links WHERE id = ?)`
+	err := s.db.QueryRow(query, id).Scan(&exists)
+	return exists, err
+}
+
 // DeleteLink removes a link from the database by its ID.
 func (s *Store) DeleteLink(id int64) error {
 	deleteSQL := `DELETE FROM links WHERE id = ?`
-	_, err := s.db.Exec(deleteSQL, id)
-	return err
+	result, err := s.db.Exec(deleteSQL, id)
+	if err != nil {
+		return err
+	}
+	
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	
+	if rowsAffected == 0 {
+		return fmt.Errorf("link with id %d not found", id)
+	}
+	
+	return nil
 }
