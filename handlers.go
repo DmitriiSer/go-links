@@ -50,9 +50,15 @@ func NewServer(store *Store) (*Server, error) {
 
 // rootHandler is the main entry point for all requests.
 func (s *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
-	// Route to the management portal
+	// Handle portal requests
 	if r.URL.Path == "/go" {
 		s.goPortalHandler(w, r)
+		return
+	}
+	
+	// Handle portal link management
+	if strings.HasPrefix(r.URL.Path, "/go/links") {
+		s.goLinksRouter(w, r)
 		return
 	}
 
@@ -70,6 +76,116 @@ func (s *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Handle redirects
 	s.redirectHandler(w, r)
+}
+
+// goLinksRouter handles /go/links/* routes for CRUD operations
+func (s *Server) goLinksRouter(w http.ResponseWriter, r *http.Request) {
+	// Parse the path to extract ID if present
+	path := strings.TrimPrefix(r.URL.Path, "/go/links")
+	if path == "" {
+		// /go/links - create new link
+		if r.Method == http.MethodPost {
+			s.handlePortalPost(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+	
+	// /go/links/{id} - edit/delete link
+	if path[0] == '/' {
+		idStr := path[1:]
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			http.Error(w, "Invalid link ID", http.StatusBadRequest)
+			return
+		}
+		
+		// Handle method override for PUT/DELETE via forms
+		method := r.Method
+		if r.Method == http.MethodPost {
+			if methodOverride := r.FormValue("_method"); methodOverride != "" {
+				method = methodOverride
+			}
+		}
+		
+		switch method {
+		case http.MethodPut:
+			s.handlePortalUpdate(w, r, id)
+		case http.MethodDelete:
+			s.handlePortalDelete(w, r, id)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+	
+	http.NotFound(w, r)
+}
+
+// handlePortalUpdate handles updating a link via the portal
+func (s *Server) handlePortalUpdate(w http.ResponseWriter, r *http.Request, id int64) {
+	// Parse form data
+	err := r.ParseForm()
+	if err != nil {
+		log.Printf("Error parsing form: %v", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	// Get form values
+	path := strings.TrimSpace(r.FormValue("path"))
+	url := strings.TrimSpace(r.FormValue("url"))
+
+	// Create link object for validation
+	link := Link{
+		ID:   id,
+		Path: path,
+		URL:  url,
+	}
+
+	// Validate the link
+	errors := make(map[string]string)
+	if err := validateLink(link); err != nil {
+		errors["General"] = err.Error()
+	}
+
+	// If validation passes, update the link
+	if len(errors) == 0 {
+		err = s.store.UpdateLink(id, path, url)
+		if err != nil {
+			log.Printf("Error updating link: %v", err)
+			if strings.Contains(err.Error(), "already exists") {
+				errors["Path"] = err.Error()
+			} else {
+				errors["General"] = "Failed to update link"
+			}
+		} else {
+			// Success - redirect
+			http.Redirect(w, r, "/go?success=Link updated successfully", http.StatusSeeOther)
+			return
+		}
+	}
+
+	// If we get here, there were errors
+	s.renderPortalWithForm(w, r, link, errors, true, true, "")
+}
+
+// handlePortalDelete handles deleting a link via the portal
+func (s *Server) handlePortalDelete(w http.ResponseWriter, r *http.Request, id int64) {
+	err := s.store.DeleteLink(id)
+	if err != nil {
+		log.Printf("Error deleting link: %v", err)
+		if strings.Contains(err.Error(), "not found") {
+			http.Redirect(w, r, "/go?error=Link not found", http.StatusSeeOther)
+		} else {
+			http.Redirect(w, r, "/go?error=Failed to delete link", http.StatusSeeOther)
+		}
+		return
+	}
+
+	// Success
+	http.Redirect(w, r, "/go?success=Link deleted successfully", http.StatusSeeOther)
 }
 
 // redirectHandler handles the URL redirection logic.
@@ -106,11 +222,144 @@ type PortalData struct {
 	LinkCount       int
 	MostPopularLink string
 	DatabaseStatus  string
+	SearchQuery     string
+	ShowForm        bool
+	EditMode        bool
+	Link            Link
+	Errors          map[string]string
+	SuccessMessage  string
+	ErrorMessage    string
+	InfoMessage     string
 }
 
 // goPortalHandler serves the main management UI.
 func (s *Server) goPortalHandler(w http.ResponseWriter, r *http.Request) {
+	// Handle different HTTP methods
+	switch r.Method {
+	case http.MethodGet:
+		s.handlePortalGet(w, r)
+	case http.MethodPost:
+		s.handlePortalPost(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handlePortalGet displays the portal page
+func (s *Server) handlePortalGet(w http.ResponseWriter, r *http.Request) {
+	// Get search query if any
+	searchQuery := r.URL.Query().Get("search")
+	
 	// Get all links from the database
+	links, err := s.store.GetAllLinks()
+	if err != nil {
+		log.Printf("Error fetching links for portal: %v", err)
+		writeErrorJSON(w, "Failed to load links", http.StatusInternalServerError)
+		return
+	}
+
+	// Filter links if search query provided
+	if searchQuery != "" {
+		filteredLinks := []Link{}
+		for _, link := range links {
+			if strings.Contains(strings.ToLower(link.Path), strings.ToLower(searchQuery)) ||
+			   strings.Contains(strings.ToLower(link.URL), strings.ToLower(searchQuery)) {
+				filteredLinks = append(filteredLinks, link)
+			}
+		}
+		links = filteredLinks
+	}
+
+	// Calculate dashboard stats
+	var mostRecentLink string
+	if len(links) > 0 {
+		// Use the last link in the sorted list as "most recent"
+		// (links are ordered by path, so we'll use the last one for now)
+		mostRecentLink = links[len(links)-1].Path
+	}
+
+	// Check for messages in URL
+	successMessage := r.URL.Query().Get("success")
+	errorMessage := r.URL.Query().Get("error")
+
+	// Prepare template data
+	data := PortalData{
+		Title:           "Portal",
+		PageHeader:      "Link Management Portal", 
+		PageDescription: "Manage your go links with ease",
+		ShowDashboard:   true,
+		Links:           links,
+		LinkCount:       len(links),
+		MostPopularLink: mostRecentLink,
+		DatabaseStatus:  "OK",
+		SearchQuery:     searchQuery,
+		ShowForm:        false,
+		EditMode:        false,
+		Errors:          make(map[string]string),
+		SuccessMessage:  successMessage,
+		ErrorMessage:    errorMessage,
+	}
+
+	// Render the portal template
+	err = s.templates.ExecuteTemplate(w, "base.html", data)
+	if err != nil {
+		log.Printf("Template execution error: %v", err)
+		writeErrorJSON(w, "Template rendering error", http.StatusInternalServerError)
+		return
+	}
+}
+
+// handlePortalPost handles form submissions for creating links
+func (s *Server) handlePortalPost(w http.ResponseWriter, r *http.Request) {
+	// Parse form data
+	err := r.ParseForm()
+	if err != nil {
+		log.Printf("Error parsing form: %v", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	// Get form values
+	path := strings.TrimSpace(r.FormValue("path"))
+	url := strings.TrimSpace(r.FormValue("url"))
+
+	// Create link object for validation
+	link := Link{
+		Path: path,
+		URL:  url,
+	}
+
+	// Validate the link
+	errors := make(map[string]string)
+	if err := validateLink(link); err != nil {
+		// Parse validation error
+		errors["General"] = err.Error()
+	}
+
+	// If validation passes, create the link
+	if len(errors) == 0 {
+		err = s.store.CreateLink(path, url)
+		if err != nil {
+			log.Printf("Error creating link: %v", err)
+			if strings.Contains(err.Error(), "already exists") {
+				errors["Path"] = err.Error()
+			} else {
+				errors["General"] = "Failed to create link"
+			}
+		} else {
+			// Success - redirect to avoid resubmission
+			http.Redirect(w, r, "/go?success=Link created successfully", http.StatusSeeOther)
+			return
+		}
+	}
+
+	// If we get here, there were errors - redisplay form with errors
+	s.renderPortalWithForm(w, r, link, errors, true, false, "")
+}
+
+// renderPortalWithForm renders the portal with the form visible and any messages
+func (s *Server) renderPortalWithForm(w http.ResponseWriter, r *http.Request, link Link, errors map[string]string, showForm bool, editMode bool, successMessage string) {
+	// Get all links for display
 	links, err := s.store.GetAllLinks()
 	if err != nil {
 		log.Printf("Error fetching links for portal: %v", err)
@@ -121,10 +370,16 @@ func (s *Server) goPortalHandler(w http.ResponseWriter, r *http.Request) {
 	// Calculate dashboard stats
 	var mostRecentLink string
 	if len(links) > 0 {
-		// Use the last link in the sorted list as "most recent"
-		// (links are ordered by path, so we'll use the last one for now)
 		mostRecentLink = links[len(links)-1].Path
 	}
+
+	// Check for success message in URL
+	if successMessage == "" {
+		successMessage = r.URL.Query().Get("success")
+	}
+	
+	// Check for error message in URL
+	errorMessage := r.URL.Query().Get("error")
 
 	// Prepare template data
 	data := PortalData{
@@ -136,6 +391,12 @@ func (s *Server) goPortalHandler(w http.ResponseWriter, r *http.Request) {
 		LinkCount:       len(links),
 		MostPopularLink: mostRecentLink,
 		DatabaseStatus:  "OK",
+		ShowForm:        showForm,
+		EditMode:        editMode,
+		Link:            link,
+		Errors:          errors,
+		SuccessMessage:  successMessage,
+		ErrorMessage:    errorMessage,
 	}
 
 	// Render the portal template

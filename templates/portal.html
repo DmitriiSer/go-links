@@ -2,6 +2,12 @@
 <!-- Portal Dashboard -->
 <div class="space-y-6">
 
+    <!-- Messages -->
+    {{template "messages" .}}
+
+    <!-- Link Form (hidden by default) -->
+    {{template "link-form" .}}
+
     <!-- Links Table -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div class="p-4 sm:px-6 border-b border-gray-200">
@@ -15,7 +21,7 @@
                     </p>
                 </div>
                 <div class="mt-4 sm:mt-0">
-                    <button type="button"
+                    <button type="button" onclick="toggleForm(true)"
                         class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-go-blue hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-go-blue">
                         <!-- Plus icon -->
                         <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
@@ -47,93 +53,18 @@
                                 clip-rule="evenodd" />
                         </svg>
                     </div>
-                    <input type="text" id="search" name="search"
-                        class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-go-blue focus:border-go-blue"
-                        placeholder="Search by path or URL...">
+                    <form method="GET" action="/go">
+                        <input type="text" id="search" name="search" value="{{.SearchQuery}}"
+                            class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-go-blue focus:border-go-blue"
+                            placeholder="Search by path or URL...">
+                    </form>
                 </div>
             </div>
         </div>
 
         <!-- Table Content -->
         <div id="links-table">
-            {{if .Links}}
-            <div class="overflow-hidden">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col"
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Path
-                            </th>
-                            <th scope="col"
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Destination URL
-                            </th>
-                            <th scope="col"
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Actions
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        {{range .Links}}
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="flex items-center">
-                                    <div>
-                                        <div class="text-sm font-medium text-gray-900">
-                                            /{{.Path}}
-                                        </div>
-                                        <div class="text-sm text-gray-500">
-                                            <a href="/{{.Path}}" target="_blank"
-                                                class="text-go-blue hover:text-blue-800">
-                                                Test link →
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-6 py-4">
-                                <div class="text-sm text-gray-900 break-all">{{.URL}}</div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <button class="text-go-blue hover:text-blue-800 mr-4">
-                                    Edit
-                                </button>
-                                <button class="text-go-red hover:text-red-800">
-                                    Delete
-                                </button>
-                            </td>
-                        </tr>
-                        {{end}}
-                    </tbody>
-                </table>
-            </div>
-            {{else}}
-            <!-- Empty State -->
-            <div class="text-center py-12">
-                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                    <path
-                        d="M34 40h10v-4a6 6 0 00-10.712-3.714M34 40H14m20 0v-4a9.971 9.971 0 00-.712-3.714M14 40H4v-4a6 6 0 0110.713-3.714M14 40v-4c0-1.313.253-2.566.713-3.714m0 0A9.971 9.971 0 0118 28a9.97 9.97 0 015 1.286"
-                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-                <h3 class="mt-2 text-sm font-medium text-gray-900">No links yet</h3>
-                <p class="mt-1 text-sm text-gray-500">Get started by creating your first go link.</p>
-                <div class="mt-6">
-                    <button type="button"
-                        class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-go-blue hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-go-blue">
-                        <!-- Plus icon -->
-                        <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
-                            fill="currentColor">
-                            <path fill-rule="evenodd"
-                                d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                                clip-rule="evenodd" />
-                        </svg>
-                        Add Link
-                    </button>
-                </div>
-            </div>
-            {{end}}
+            {{template "link-list" .}}
         </div>
     </div>
 
