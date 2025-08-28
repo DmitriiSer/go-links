@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Go Links</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <!-- Custom Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'go-blue': '#0066cc',
+                        'go-green': '#28a745',
+                        'go-red': '#dc3545'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation Header -->
+    <nav class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo/Title -->
+                <div class="flex items-center">
+                    <h1 class="text-xl font-semibold text-gray-900">
+                        <a href="/go" class="hover:text-go-blue transition-colors">
+                            Go Links Portal
+                        </a>
+                    </h1>
+                </div>
+
+                <!-- Navigation Links -->
+                <div class="flex items-center space-x-4">
+                    <a href="/swagger" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm font-medium">
+                        API Docs
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <!-- Page Header -->
+        {{if .PageHeader}}
+        <div class="px-4 py-6 sm:px-0">
+            <div class="border-4 border-dashed border-gray-200 rounded-lg p-8 text-center">
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">{{.PageHeader}}</h2>
+                {{if .PageDescription}}
+                <p class="text-gray-600">{{.PageDescription}}</p>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+
+        <!-- Content Area -->
+        <div class="px-4 py-6 sm:px-0">
+            {{template "content" .}}
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 mt-12">
+        <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center">
+                <p class="text-sm text-gray-500">
+                    Go Links - Simple URL Shortener
+                </p>
+                <p class="text-sm text-gray-500">
+                    Built with Go + HTMX + Tailwind CSS
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- HTMX Config -->
+    <script>
+        // Configure HTMX
+        document.body.addEventListener('htmx:configRequest', (event) => {
+            event.detail.headers['X-Requested-With'] = 'XMLHttpRequest';
+        });
+
+        // Show loading indicators
+        document.body.addEventListener('htmx:beforeRequest', (event) => {
+            const indicator = event.target.querySelector('.htmx-indicator');
+            if (indicator) {
+                indicator.classList.remove('hidden');
+            }
+        });
+
+        document.body.addEventListener('htmx:afterRequest', (event) => {
+            const indicator = event.target.querySelector('.htmx-indicator');
+            if (indicator) {
+                indicator.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+
+</html>

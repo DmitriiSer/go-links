@@ -21,12 +21,25 @@ type Server struct {
 
 // NewServer creates a new Server with necessary dependencies.
 func NewServer(store *Store) (*Server, error) {
-	// In a real application, you'd parse templates from files.
-	// For now, we'll use a placeholder.
-	// This will be replaced with actual template parsing.
-	templates, err := template.New("go-links").Parse(`{{define "manage.html"}}<h1>Go Links Portal</h1>{{end}}`)
+	// Parse template files from the templates directory
+	templates, err := template.ParseGlob("templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("error parsing templates: %w", err)
+	}
+
+	// Parse component templates
+	componentTemplates, err := template.ParseGlob("templates/components/*.html")
+	if err != nil {
+		// Components are optional for now, just log the error
+		log.Printf("Warning: Could not parse component templates: %v", err)
+	} else {
+		// Add component templates to the main template
+		for _, t := range componentTemplates.Templates() {
+			templates, err = templates.AddParseTree(t.Name(), t.Tree)
+			if err != nil {
+				log.Printf("Warning: Could not add component template %s: %v", t.Name(), err)
+			}
+		}
 	}
 
 	return &Server{
@@ -66,7 +79,10 @@ func (s *Server) redirectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	link, err := s.store.GetLinkByPath(r.URL.Path)
+	// Strip the leading slash from the path to match database storage
+	path := strings.TrimPrefix(r.URL.Path, "/")
+
+	link, err := s.store.GetLinkByPath(path)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			http.NotFound(w, r)
@@ -80,14 +96,40 @@ func (s *Server) redirectHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, link.URL, http.StatusFound)
 }
 
+// PortalData holds data for the portal template.
+type PortalData struct {
+	Title           string
+	PageHeader      string
+	PageDescription string
+	Links           []Link
+	LinkCount       int
+}
+
 // goPortalHandler serves the main management UI.
 func (s *Server) goPortalHandler(w http.ResponseWriter, r *http.Request) {
-	// This will eventually render a beautiful HTML page with a list of links.
-	// For now, it's a placeholder.
-	err := s.templates.ExecuteTemplate(w, "manage.html", nil)
+	// Get all links from the database
+	links, err := s.store.GetAllLinks()
+	if err != nil {
+		log.Printf("Error fetching links for portal: %v", err)
+		writeErrorJSON(w, "Failed to load links", http.StatusInternalServerError)
+		return
+	}
+
+	// Prepare template data
+	data := PortalData{
+		Title:           "Portal",
+		PageHeader:      "Link Management Portal",
+		PageDescription: "Manage your go links with ease",
+		Links:           links,
+		LinkCount:       len(links),
+	}
+
+	// Render the portal template
+	err = s.templates.ExecuteTemplate(w, "base.html", data)
 	if err != nil {
 		log.Printf("Template execution error: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		writeErrorJSON(w, "Template rendering error", http.StatusInternalServerError)
+		return
 	}
 }
 
