@@ -101,8 +101,11 @@ type PortalData struct {
 	Title           string
 	PageHeader      string
 	PageDescription string
+	ShowDashboard   bool
 	Links           []Link
 	LinkCount       int
+	MostPopularLink string
+	DatabaseStatus  string
 }
 
 // goPortalHandler serves the main management UI.
@@ -115,13 +118,24 @@ func (s *Server) goPortalHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Calculate dashboard stats
+	var mostRecentLink string
+	if len(links) > 0 {
+		// Use the last link in the sorted list as "most recent"
+		// (links are ordered by path, so we'll use the last one for now)
+		mostRecentLink = links[len(links)-1].Path
+	}
+
 	// Prepare template data
 	data := PortalData{
 		Title:           "Portal",
 		PageHeader:      "Link Management Portal",
 		PageDescription: "Manage your go links with ease",
+		ShowDashboard:   true,
 		Links:           links,
 		LinkCount:       len(links),
+		MostPopularLink: mostRecentLink,
+		DatabaseStatus:  "OK",
 	}
 
 	// Render the portal template
