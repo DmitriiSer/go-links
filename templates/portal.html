@@ -1,6 +1,6 @@
 {{define "content"}}
 <!-- Portal Dashboard -->
-<div class="space-y-6">
+<div id="portal-content" class="space-y-6">
 
     <!-- Messages -->
     {{template "messages" .}}
@@ -21,7 +21,8 @@
                     </p>
                 </div>
                 <div class="mt-4 sm:mt-0">
-                    <button type="button" onclick="toggleForm(true)"
+                    <button type="button" hx-get="/go/htmx/links/new" hx-target="#link-form-container"
+                        hx-swap="outerHTML"
                         class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-go-blue hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-go-blue">
                         <!-- Plus icon -->
                         <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
@@ -53,11 +54,25 @@
                                 clip-rule="evenodd" />
                         </svg>
                     </div>
-                    <form method="GET" action="/go">
-                        <input type="text" id="search" name="search" value="{{.SearchQuery}}"
-                            class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-go-blue focus:border-go-blue"
+                    <div class="relative">
+                        <input type="text" id="search" name="search" value="{{.SearchQuery}}" hx-get="/go/htmx/search"
+                            hx-target="#links-table" hx-trigger="keyup changed delay:300ms"
+                            hx-indicator="#search-loading"
+                            class="block w-full px-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-go-blue focus:border-go-blue"
                             placeholder="Search by path or URL...">
-                    </form>
+                        <!-- Search loading indicator -->
+                        <div id="search-loading"
+                            class="htmx-indicator absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                            <svg class="animate-spin h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg"
+                                fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
