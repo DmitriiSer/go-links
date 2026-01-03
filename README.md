@@ -8,7 +8,7 @@ A lightweight, self-hosted URL shortener inspired by internal "Go Links" systems
 - **Runtime OpenAPI + Swagger UI**: API spec is generated at runtime; explore and test via Swagger UI.
 - **REST JSON API**: Full CRUD for links under `/api`.
 - **Pure Go SQLite**: Uses a CGo-free SQLite driver; easy cross-compilation and ARM-friendly.
-- **Easy deploy**: Single binary; works well behind Nginx/HTTPS.
+- **Easy deploy**: Single binary or Docker container; works well behind Nginx/HTTPS.
 
 ## Getting Started
 
@@ -32,6 +32,7 @@ A lightweight, self-hosted URL shortener inspired by internal "Go Links" systems
     ```
 
 3.  **Run the server:**
+
     ```bash
     go run .
     ```
@@ -39,29 +40,123 @@ A lightweight, self-hosted URL shortener inspired by internal "Go Links" systems
     The server starts on `http://localhost:3000` and creates `links.db` in the project directory.
 
     **Configuration options:**
+
     ```bash
     # Using environment variables
     PORT=8080 DB_PATH=/data/links.db go run .
-    
+
     # Using command line flags
     go run . --port 8080 --db-path /data/links.db --host 127.0.0.1
-    
+
     # Using short flags
     go run . -p 8080 -d /data/links.db -h 0.0.0.0
-    
+
     # Show help
     go run . --help
     ```
 
     Optional (dev auto-reload):
+
     ```bash
     # Install wgo (file watcher for Go development)
     go install github.com/bokwoon95/wgo@latest
-    
+
     # wgo wraps a command and reruns on file changes
     wgo go run .
     # If PATH issues occur: /home/<you>/go/bin/wgo go run .
     ```
+
+## Docker Deployment
+
+### Prerequisites
+
+- Docker and Docker Compose installed
+
+### Using Docker Compose (Recommended)
+
+1. **Clone the repository:**
+
+   ```bash
+   git clone https://github.com/DmitriiSer/go-links
+   cd go-links
+   ```
+
+2. **Start the service:**
+
+   ```bash
+   docker compose up -d
+   ```
+
+   The service will be available at `http://localhost:3000` (or your configured port).
+
+3. **View logs:**
+
+   ```bash
+   docker compose logs -f
+   ```
+
+4. **Stop the service:**
+   ```bash
+   docker compose down
+   ```
+
+**Configuration via environment variables:**
+
+You can customize the deployment using environment variables or a `.env` file:
+
+```bash
+# Using environment variables
+PORT=8080 DB_VOLUME_PATH=./data/links.db docker compose up -d
+
+# Or create a .env file
+cat > .env << EOF
+PORT=8080
+DB_VOLUME_PATH=./data/links.db
+EOF
+docker compose up -d
+```
+
+**Available environment variables:**
+
+| Variable         | Description                | Default      |
+| ---------------- | -------------------------- | ------------ |
+| `PORT`           | Port on the host machine   | `3000`       |
+| `DB_VOLUME_PATH` | Database file path on host | `./links.db` |
+
+Note: The application inside the container always runs on port 3000. The `PORT` variable only controls which port on your host machine maps to the container's port 3000.
+
+### Using Docker directly
+
+1. **Build the image:**
+
+   ```bash
+   docker build -t go-links .
+   ```
+
+2. **Run the container:**
+
+   ```bash
+   docker run -d \
+     --name go-links \
+     -p 3000:3000 \
+     -v ./links.db:/app/links.db \
+     --restart unless-stopped \
+     go-links
+   ```
+
+   The application defaults to port 3000 and database path `/app/links.db` inside the container, so no environment variables are needed.
+
+**Multi-platform builds:**
+
+The Dockerfile supports multi-platform builds. To build for a specific platform:
+
+```bash
+# Build for ARM64 (e.g., Raspberry Pi)
+docker build --platform linux/arm64 -t go-links .
+
+# Build for AMD64
+docker build --platform linux/amd64 -t go-links .
+```
 
 ## Configuration
 
@@ -69,20 +164,20 @@ Go Links supports flexible configuration via environment variables and command l
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Server port | `3000` |
-| `HOST` | Server host (empty = all interfaces) | `` |
-| `DB_PATH` | Database file path | `./links.db` |
+| Variable  | Description                          | Default      |
+| --------- | ------------------------------------ | ------------ |
+| `PORT`    | Server port                          | `3000`       |
+| `HOST`    | Server host (empty = all interfaces) | ``           |
+| `DB_PATH` | Database file path                   | `./links.db` |
 
 ### Command Line Flags
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--port` | `-p` | Server port |
-| `--host` | `-h` | Server host |
-| `--db-path` | `-d` | Database file path |
-| `--help` | | Show help information |
+| Flag        | Short | Description           |
+| ----------- | ----- | --------------------- |
+| `--port`    | `-p`  | Server port           |
+| `--host`    | `-h`  | Server host           |
+| `--db-path` | `-d`  | Database file path    |
+| `--help`    |       | Show help information |
 
 ### Examples
 
@@ -94,7 +189,7 @@ Go Links supports flexible configuration via environment variables and command l
 PORT=8080 go run .
 
 # Docker/container deployment
-docker run -e PORT=3000 -e DB_PATH=/data/links.db go-links
+docker run -d -p 3000:3000 -v ./links.db:/app/links.db -e PORT=3000 -e DB_PATH=/app/links.db go-links
 
 # Custom host binding
 ./go-links --host 127.0.0.1 --port 8080
@@ -106,24 +201,29 @@ docker run -e PORT=3000 -e DB_PATH=/data/links.db go-links
 - **OpenAPI JSON**: `http://localhost:3000/api/swagger/openapi.json`
 
 Notes for reverse proxy/HTTPS:
+
 - The spec advertises `https` and leaves `host` empty so the UI uses the current origin. Works cleanly behind Nginx TLS termination.
 
 ### Endpoints (under `/api`)
 
 - `GET /api/links` → List links
+
   ```bash
   curl http://localhost:3000/api/links
   ```
 
 - `POST /api/links` → Create link
+
   ```bash
   curl -X POST http://localhost:3000/api/links \
     -H 'Content-Type: application/json' \
     -d '{"path":"g","url":"https://google.com"}'
   ```
+
   - Validation: rejects empty/malformed URLs, non-http(s) schemes, and missing host (400).
 
 - `PUT /api/links/{id}` → Update link
+
   ```bash
   curl -X PUT http://localhost:3000/api/links/1 \
     -H 'Content-Type: application/json' \
@@ -164,8 +264,9 @@ This project is under active development. Here is a summary of completed feature
 ### Planned
 
 **Link Management Portal at `/go` (SSR templates + HTMX)**
+
 - [x] Phase 1: Template Foundation (base layout, Tailwind CSS, data display)
-- [x] Phase 2: Static Portal (complete CRUD via forms, validation, search)  
+- [x] Phase 2: Static Portal (complete CRUD via forms, validation, search)
 - [x] Phase 3: HTMX Integration (no page reloads, real-time search, dynamic forms)
 - [ ] Phase 4: Polish & Enhancement (UX improvements, accessibility)
 
