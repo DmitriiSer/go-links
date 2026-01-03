@@ -1,0 +1,10 @@
+services:
+  go-links:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - DB_PATH=${DB_PATH:-/app/links.db}
+    volumes:
+      - ${DB_VOLUME_PATH:-./links.db}:/app/links.db
