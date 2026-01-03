@@ -1,0 +1,37 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+LICENSE
+
+# Docker files (not needed in image)
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Database files (mounted as volume)
+*.db
+links.db
+
+# Compiled binaries
+go-links
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.o
+*.a
+*.so
